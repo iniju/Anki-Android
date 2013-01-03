@@ -29,11 +29,13 @@ import android.content.res.Resources.NotFoundException;
 import android.graphics.Color;
 import android.graphics.Paint.Align;
 import android.os.Bundle;
+import android.os.Message;
 import android.support.v4.app.Fragment;
 import android.text.Html;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -48,6 +50,7 @@ import android.widget.TextView;
 
 import com.ichi2.anim.ActivityTransitionAnimation;
 import com.ichi2.anim.ViewAnimation;
+import com.ichi2.anki.controller.IAnkiControllable;
 import com.ichi2.async.DeckTask;
 import com.ichi2.async.DeckTask.TaskData;
 import com.ichi2.charts.ChartBuilder;
@@ -59,7 +62,6 @@ import com.ichi2.themes.StyledDialog;
 import com.ichi2.themes.StyledOpenCollectionDialog;
 import com.ichi2.themes.StyledProgressDialog;
 import com.ichi2.themes.Themes;
-
 import org.achartengine.ChartFactory;
 import org.achartengine.GraphicalView;
 import org.achartengine.chart.BarChart;
@@ -74,9 +76,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 
-public class StudyOptionsFragment extends Fragment {
+public class StudyOptionsFragment extends Fragment implements IAnkiControllable {
 
     /**
      * Available options performed by other activities
@@ -105,6 +106,10 @@ public class StudyOptionsFragment extends Fragment {
     private static final int DIALOG_CUSTOM_STUDY = 1;
     private static final int DIALOG_CUSTOM_STUDY_DETAILS = 2;
 
+    private static final int MSG_CNTRL_REVIEWER = 0x110;
+    private static final int MSG_CNTRL_BACK = 0x111;
+    private static final int MSG_CNTRL_CLOSE = 0x112;
+
     private int mCustomDialogChoice;
     
 
@@ -128,7 +133,7 @@ public class StudyOptionsFragment extends Fragment {
      * UI elements for "Study Options" view
      */
     private View mStudyOptionsView;
-    private Button mButtonStart;
+    public Button mButtonStart;
     private Button mFragmentedCram;
 //    private Button mButtonUp;
 //    private Button mButtonDown;
@@ -381,7 +386,7 @@ public class StudyOptionsFragment extends Fragment {
     protected View createView(LayoutInflater inflater, Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Log.i(AnkiDroidApp.TAG, "StudyOptions - createView()");
+        Log.i(AnkiDroidApp.TAG, "StudyOptions - createView()");
 
         restorePreferences();
 
@@ -430,7 +435,7 @@ public class StudyOptionsFragment extends Fragment {
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
-        // Log.i(AnkiDroidApp.TAG, "onConfigurationChanged");
+        Log.i(AnkiDroidApp.TAG, "onConfigurationChanged");
 	if (mTextDeckName == null) {
 		// layout not yet initialized
 		return;
@@ -475,7 +480,7 @@ public class StudyOptionsFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // Log.i(AnkiDroidApp.TAG, "StudyOptions - onDestroy()");
+        Log.i(AnkiDroidApp.TAG, "StudyOptions - onDestroy()");
         // if (mUnmountReceiver != null) {
         // unregisterReceiver(mUnmountReceiver);
         // }
@@ -501,7 +506,6 @@ public class StudyOptionsFragment extends Fragment {
 
 
     private void closeStudyOptions() {
-        getActivity();
         closeStudyOptions(Activity.RESULT_OK);
     }
 
@@ -1131,7 +1135,7 @@ public class StudyOptionsFragment extends Fragment {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
-        // Log.i(AnkiDroidApp.TAG, "StudyOptionsFragment: onActivityResult");
+        Log.i(AnkiDroidApp.TAG, "StudyOptionsFragment: onActivityResult");
 
         if (resultCode == DeckPicker.RESULT_DB_ERROR) {
             closeStudyOptions(DeckPicker.RESULT_DB_ERROR);
@@ -1169,7 +1173,7 @@ public class StudyOptionsFragment extends Fragment {
             } else if (requestCode == ADD_NOTE && resultCode != Activity.RESULT_CANCELED) {
                 resetAndUpdateValuesFromDeck();
             } else if (requestCode == REQUEST_REVIEW) {
-                // Log.i(AnkiDroidApp.TAG, "Result code = " + resultCode);
+                Log.i(AnkiDroidApp.TAG, "Result code = " + resultCode);
                 // TODO: Return to standard scheduler
                 // TODO: handle big widget
                 switch (resultCode) {
@@ -1387,4 +1391,44 @@ public class StudyOptionsFragment extends Fragment {
     public boolean dbSaveNecessary() {
     	return !mDontSaveOnStop;
     }
+
+	@Override
+	public Bundle getSupportedControllerActions() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void handleControllerMessage(Message msg) {
+    	Log.i(AnkiDroidApp.TAG, "Received controller message: " + msg.what);
+    	switch (msg.what) {
+    	case MSG_CNTRL_REVIEWER:
+    		if (mCurrentContentView != CONTENT_CONGRATS) {
+    			openReviewer();
+    		}
+    		break;
+    	case MSG_CNTRL_BACK:
+    		if (mCurrentContentView == CONTENT_CONGRATS) {
+    			finishCongrats();
+    		} else {
+    			closeStudyOptions();
+    		}
+    		break;
+    	case MSG_CNTRL_CLOSE:
+    		getActivity().dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK));
+    		getActivity().dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK));
+    		break;
+    	default:
+    	}
+	}
+
+	@Override
+	public boolean canStartController() {
+		return false;
+	}
+
+	@Override
+	public boolean canStopController() {
+		return false;
+	}
 }
